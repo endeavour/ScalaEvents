@@ -1,22 +1,22 @@
 import collection.mutable
 
 trait IEvent[TArgs] {
-  def Subscribe(action: TArgs => Unit): Disposable
+  def subscribe(action: TArgs => Unit): Disposable
 }
 
 class Event[A] {
 
   val listeners: mutable.ArrayBuffer[(A) => Unit] = mutable.ArrayBuffer.empty
 
-  def Trigger(args: A) {
+  def trigger(args: A) {
     for (val listener <- listeners) {
       listener(args)
     }
   }
 
-  def Publish(): IEvent[A] = {
+  def publish(): IEvent[A] = {
     new IEvent[A] {
-      def Subscribe(action: (A) => Unit): Disposable = {
+      def subscribe(action: (A) => Unit): Disposable = {
         listeners += action
 
         new Disposable {
@@ -33,30 +33,30 @@ class Event[A] {
 
 object Event {
 
-  def Map[A, B](mapping: A => B)(evt: IEvent[A]): IEvent[B] = {
+  def map[A, B](mapping: A => B)(evt: IEvent[A]): IEvent[B] = {
     new IEvent[B] {
-      def Subscribe(action: B => Unit) = evt.Subscribe(a => action(mapping(a)))
+      def subscribe(action: B => Unit) = evt.subscribe(a => action(mapping(a)))
     }
   }
 
-  def Filter[A](filter: A => Boolean)(evt: IEvent[A]): IEvent[A] = {
+  def filter[A](filter: A => Boolean)(evt: IEvent[A]): IEvent[A] = {
     new IEvent[A] {
-      def Subscribe(action: (A) => Unit) = evt.Subscribe(args => filter(args) match {
+      def subscribe(action: (A) => Unit) = evt.subscribe(args => filter(args) match {
         case true => action(args)
         case false => ()
       })
     }
   }
 
-  def Choose[A](choose: A => Option[A])(evt: IEvent[A]): IEvent[A] = {
-    Filter((a: A) => choose(a) != None)(evt)
+  def choose[A](choose: A => Option[A])(evt: IEvent[A]): IEvent[A] = {
+    filter((a: A) => choose(a) != None)(evt)
   }
 
-  def Merge[A](first: IEvent[A])(second: IEvent[A]): IEvent[A] = {
+  def merge[A](first: IEvent[A])(second: IEvent[A]): IEvent[A] = {
     new IEvent[A] {
-      def Subscribe(action: (A) => Unit) = {
-        val disposable1 = first.Subscribe(action(_))
-        val disposable2 = second.Subscribe(action(_))
+      def subscribe(action: (A) => Unit) = {
+        val disposable1 = first.subscribe(action(_))
+        val disposable2 = second.subscribe(action(_))
 
         new ActionDisposable(() => {
           disposable1.dispose()
@@ -66,11 +66,11 @@ object Event {
     }
   }
 
-  def Pairwise[A](evt: IEvent[A]): IEvent[(A, A)] = {
+  def pairwise[A](evt: IEvent[A]): IEvent[(A, A)] = {
     new IEvent[(A, A)] {
-      def Subscribe(action: ((A, A)) => Unit) = {
+      def subscribe(action: ((A, A)) => Unit) = {
         var last: Option[A] = None
-        evt.Subscribe(newA => {
+        evt.subscribe(newA => {
           last match {
             case None => {
               last = Some(newA)
@@ -85,16 +85,16 @@ object Event {
     }
   }
 
-  def Partition[A](predicate: A => Boolean)(evt: IEvent[A]): (IEvent[A], IEvent[A]) = {
-    Split[A, A, A](e => if (predicate(e)) Left(e) else Right(e))(evt)
+  def partition[A](predicate: A => Boolean)(evt: IEvent[A]): (IEvent[A], IEvent[A]) = {
+    split[A, A, A](e => if (predicate(e)) Left(e) else Right(e))(evt)
   }
 
-  def Scan[U, T](aggregate: (U, T) => U)(seed: U)(source: IEvent[T]): IEvent[U] = {
+  def scan[U, T](aggregate: (U, T) => U)(seed: U)(source: IEvent[T]): IEvent[U] = {
     new IEvent[U] {
-      def Subscribe(action: (U) => Unit) = {
+      def subscribe(action: (U) => Unit) = {
         var currentValue = seed
 
-        source.Subscribe(t => {
+        source.subscribe(t => {
           currentValue = aggregate(currentValue, t)
           action(currentValue)
         })
@@ -102,15 +102,15 @@ object Event {
     }
   }
 
-  def Split[T, U1, U2](choice: T => scala.Either[U1, U2])(evt: IEvent[T]): (IEvent[U1], IEvent[U2]) = {
+  def split[T, U1, U2](choice: T => scala.Either[U1, U2])(evt: IEvent[T]): (IEvent[U1], IEvent[U2]) = {
 
     val (evt1, evt2) = (new Event[U1], new Event[U2])
 
-    Map(choice)(evt).Subscribe(_ match {
-      case Left(a) => evt1.Trigger(a)
-      case Right(b) => evt2.Trigger(b)
+    map(choice)(evt).subscribe(_ match {
+      case Left(a) => evt1.trigger(a)
+      case Right(b) => evt2.trigger(b)
     })
 
-    (evt1.Publish(), evt2.Publish())
+    (evt1.publish(), evt2.publish())
   }
 }

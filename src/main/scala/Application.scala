@@ -4,20 +4,20 @@ object Main extends App {
   override def main(args:Array[String]){
 
     val testEvent = new Event[Int]
-    testEvent.Trigger(1)
-    testEvent.Trigger(2)
-    testEvent.Trigger(3)
+    testEvent.trigger(1)
+    testEvent.trigger(2)
+    testEvent.trigger(3)
 
-    val evt = testEvent.Publish()
+    val evt = testEvent.publish()
 
-    val (odd, even) = Event.Partition[Int](_ % 2 == 0)(evt)
+    val (odd, even) = Event.partition[Int](_ % 2 == 0)(evt)
 
-    odd.Subscribe(i => println("Odd: " + i))
-    even.Subscribe(i => println("Even: " + i))
+    odd.subscribe(i => println("Odd: " + i))
+    even.subscribe(i => println("Even: " + i))
 
     for (i <- 1 to 100)
     {
-      testEvent.Trigger(i)
+      testEvent.trigger(i)
     }
   }
 }
